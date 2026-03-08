@@ -16,6 +16,7 @@
       margin: 0;
       padding: 0;
       height: 100%;
+      width: 100%;
       font-family: Arial, sans-serif;
       background: #fff;
     }
@@ -25,18 +26,34 @@
       height: 100vh;
     }
 
+    .leaflet-control-attribution {
+      font-size: 10px;
+    }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 16px;
+      min-width: 220px;
+      max-width: 280px;
+    }
+
     .popup-title {
       font-size: 16px;
       font-weight: 700;
-      margin-bottom: 6px;
       line-height: 1.2;
+      margin-bottom: 8px;
+      color: #222;
     }
 
     .popup-text {
       font-size: 13px;
-      line-height: 1.45;
-      margin-bottom: 10px;
-      color: #333;
+      line-height: 1.5;
+      margin-bottom: 12px;
+      color: #444;
     }
 
     .popup-actions {
@@ -47,26 +64,23 @@
 
     .popup-link {
       display: inline-block;
-      padding: 8px 12px;
-      border-radius: 10px;
+      padding: 9px 14px;
+      border-radius: 12px;
       text-decoration: none;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       background: #111;
       color: #fff;
+      transition: opacity 0.2s ease;
+    }
+
+    .popup-link:hover {
+      opacity: 0.9;
     }
 
     .popup-link.secondary {
-      background: #f2f2f2;
-      color: #111;
-    }
-
-    .leaflet-popup-content-wrapper {
-      border-radius: 18px;
-    }
-
-    .leaflet-popup-content {
-      margin: 14px 16px;
+      background: #efefef;
+      color: #222;
     }
   </style>
 </head>
@@ -81,6 +95,7 @@
 
   <script>
     const API_BASE = "https://script.google.com/macros/s/AKfycbwMobJD5dDOTuTxVeyEi2hTzND02jzJRlop8GjMgn_IbjtUi-I7ri1SM7EmUXt3yBXB/exec";
+
     const DEFAULT_CENTER = [14.5975, -90.5132];
     const DEFAULT_ZOOM = 13;
 
@@ -97,13 +112,13 @@
       return norm(value) === "SI";
     }
 
+    function safeText(value) {
+      return String(value ?? "").trim();
+    }
+
     function toNumber(value, fallback = null) {
       const n = Number(value);
       return Number.isFinite(n) ? n : fallback;
-    }
-
-    function safeText(value) {
-      return String(value ?? "").trim();
     }
 
     function escapeHtml(str) {
@@ -124,6 +139,7 @@
       }
 
       const data = await res.json();
+
       if (!Array.isArray(data)) {
         throw new Error(`La respuesta de ${sheetName} no es un array.`);
       }
@@ -136,72 +152,50 @@
       return idioma === "EN" ? "EN" : "ES";
     }
 
-    function pickFirst(...values) {
-      for (const v of values) {
-        const s = safeText(v);
-        if (s) return s;
-      }
-      return "";
-    }
-
     function getTitleByLanguage(row, idioma) {
       if (idioma === "EN") {
-        return pickFirst(
-          row.NOMBRE_VISIBLE_EN,
-          row.NOMBRE_EN,
-          row.TITULO_EN,
-          row.NOMBRE_VISIBLE_ES,
-          row.NOMBRE_ES,
-          row.TITULO_ES,
-          row.NOMBRE_LUGAR,
-          row.NOMBRE
+        return safeText(
+          row.NOMBRE_VISIBLE_EN ||
+          row.NOMBRE_EN ||
+          row.TITULO_EN ||
+          row.NOMBRE_LUGAR ||
+          row.NOMBRE ||
+          ""
         );
       }
 
-      return pickFirst(
-        row.NOMBRE_VISIBLE_ES,
-        row.NOMBRE_ES,
-        row.TITULO_ES,
-        row.NOMBRE_VISIBLE_EN,
-        row.NOMBRE_EN,
-        row.TITULO_EN,
-        row.NOMBRE_LUGAR,
-        row.NOMBRE
+      return safeText(
+        row.NOMBRE_VISIBLE_ES ||
+        row.NOMBRE_ES ||
+        row.TITULO_ES ||
+        row.NOMBRE_LUGAR ||
+        row.NOMBRE ||
+        ""
       );
     }
 
     function getDescriptionByLanguage(row, idioma) {
       if (idioma === "EN") {
-        return pickFirst(
-          row.DESCRIPCION_CORTA_EN,
-          row.DESCRIPCION_EN,
-          row.DESCRIPCION_INGLES,
-          row.DESCRIPTION_EN,
-          row.DESCRIPCION_CORTA_ES,
-          row.DESCRIPCION_ES,
-          row.DESCRIPCION
+        return safeText(
+          row.DESCRIPCION_CORTA_EN ||
+          row.DESCRIPCION_EN ||
+          row.DESCRIPCION_INGLES ||
+          row.DESCRIPTION_EN ||
+          ""
         );
       }
 
-      return pickFirst(
-        row.DESCRIPCION_CORTA_ES,
-        row.DESCRIPCION_ES,
-        row.DESCRIPCION,
-        row.DESCRIPCION_CORTA_EN,
-        row.DESCRIPCION_EN,
-        row.DESCRIPCION_INGLES,
-        row.DESCRIPTION_EN
+      return safeText(
+        row.DESCRIPCION_CORTA_ES ||
+        row.DESCRIPCION_ES ||
+        row.DESCRIPCION ||
+        ""
       );
     }
 
-    function matchCategoria(row, categoriaFiltro) {
-      if (!categoriaFiltro) return true;
-
-      const cat = norm(categoriaFiltro);
-      return (
-        norm(row.CATEGORIA) === cat ||
-        norm(row.SUB_CATEGORIA) === cat
-      );
+    function matchGuia(row, guiaFiltro) {
+      if (!guiaFiltro) return true;
+      return norm(row.GUIA) === norm(guiaFiltro);
     }
 
     function matchCliente(row, clienteFiltro) {
@@ -219,9 +213,15 @@
       );
     }
 
-    function matchGuia(row, guiaFiltro) {
-      if (!guiaFiltro) return true;
-      return norm(row.GUIA) === norm(guiaFiltro);
+    function matchCategoria(row, categoriaFiltro) {
+      if (!categoriaFiltro) return true;
+
+      const categoria = norm(categoriaFiltro);
+
+      return (
+        norm(row.CATEGORIA) === categoria ||
+        norm(row.SUB_CATEGORIA) === categoria
+      );
     }
 
     function createIcon(row) {
@@ -231,14 +231,16 @@
       if (!iconUrl) {
         return L.divIcon({
           className: "custom-div-icon",
-          html: `<div style="
-            width:${size}px;
-            height:${size}px;
-            border-radius:50%;
-            background:#111;
-            border:2px solid #fff;
-            box-shadow:0 2px 8px rgba(0,0,0,0.25);
-          "></div>`,
+          html: `
+            <div style="
+              width:${size}px;
+              height:${size}px;
+              border-radius:50%;
+              background:#111;
+              border:2px solid #fff;
+              box-shadow:0 2px 8px rgba(0,0,0,0.25);
+            "></div>
+          `,
           iconSize: [size, size],
           iconAnchor: [size / 2, size],
           popupAnchor: [0, -size + 8]
@@ -246,7 +248,7 @@
       }
 
       return L.icon({
-        iconUrl,
+        iconUrl: iconUrl,
         iconSize: [size, size],
         iconAnchor: [size / 2, size],
         popupAnchor: [0, -size + 8]
@@ -256,17 +258,26 @@
     function buildPopup(row, idioma) {
       const title = escapeHtml(getTitleByLanguage(row, idioma));
       const desc = escapeHtml(getDescriptionByLanguage(row, idioma));
-      const nombreLugar = escapeHtml(pickFirst(row.NOMBRE_LUGAR, row.NOMBRE));
-      const mapsLink = safeText(row.LINK_GOOGLE_MAPS || row.LINK_MAPS || row.UBICACION_URL);
-      const reservaLink = safeText(row.LINK_RESERVA || row.RESERVA_URL);
+
+      const mapsLink = safeText(
+        row.LINK_GOOGLE_MAPS ||
+        row.LINK_MAPS ||
+        row.UBICACION_URL ||
+        ""
+      );
+
+      const reservaLink = safeText(
+        row.LINK_RESERVA ||
+        row.RESERVA_URL ||
+        ""
+      );
 
       const howToGoText = idioma === "EN" ? "How to get there" : "Cómo llegar";
       const reserveText = idioma === "EN" ? "Book" : "Reservar";
 
       return `
-        <div style="min-width:220px; max-width:280px;">
-          <div class="popup-title">${title || nombreLugar}</div>
-          ${nombreLugar && title !== nombreLugar ? `<div class="popup-text"><strong>${nombreLugar}</strong></div>` : ""}
+        <div>
+          ${title ? `<div class="popup-title">${title}</div>` : ""}
           ${desc ? `<div class="popup-text">${desc}</div>` : ""}
           <div class="popup-actions">
             ${mapsLink ? `<a class="popup-link" href="${escapeHtml(mapsLink)}" target="_blank" rel="noopener noreferrer">${howToGoText}</a>` : ""}
@@ -282,7 +293,7 @@
     const idioma = getIdioma();
 
     const map = L.map("map", {
-      zoomControl: true
+      zoomControl: false
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -339,14 +350,14 @@
           bounds.push([lat, lng]);
         });
 
-        if (bounds.length > 0 && !guiaData) {
+        if (!guiaData && bounds.length > 0) {
           map.fitBounds(bounds, { padding: [40, 40] });
         }
 
-        console.log("idioma:", idioma);
-        console.log("filtrados:", filtrados);
+        console.log("Parámetros:", { guia, cliente, categoria, idioma });
+        console.log("Lugares filtrados:", filtrados);
       } catch (error) {
-        console.error("Error general:", error);
+        console.error("Error cargando mapa:", error);
       }
     }
 
