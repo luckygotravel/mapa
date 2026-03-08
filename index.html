@@ -1,404 +1,344 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LuckyGo Travel Map</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    crossorigin=""
-  />
+<title>LuckyGo Map</title>
 
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      background: #ffffff;
-      font-family: Arial, sans-serif;
-    }
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-    #map {
-      width: 100%;
-      height: 100vh;
-    }
+<style>
 
-    .leaflet-control-zoom,
-    .leaflet-control-attribution {
-      display: none !important;
-    }
+html,body{
+margin:0;
+padding:0;
+height:100%;
+width:100%;
+font-family:Arial;
+background:#fff;
+}
 
-    .leaflet-popup-content-wrapper {
-      border-radius: 18px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-      border: 0;
-    }
+#map{
+height:100vh;
+width:100%;
+}
 
-    .leaflet-popup-tip {
-      box-shadow: none;
-    }
+/* mapa minimalista */
 
-    .leaflet-popup-content {
-      margin: 14px 14px 12px;
-      min-width: 210px;
-      max-width: 250px;
-    }
+.leaflet-control-container{
+display:none;
+}
 
-    .popup-title {
-      font-size: 15px;
-      font-weight: 700;
-      line-height: 1.2;
-      color: #222;
-      margin-bottom: 8px;
-    }
+.leaflet-popup-content-wrapper{
+border-radius:16px;
+box-shadow:0 8px 24px rgba(0,0,0,0.12);
+}
 
-    .popup-text {
-      font-size: 12.5px;
-      line-height: 1.45;
-      color: #555;
-      margin-bottom: 12px;
-    }
+.leaflet-popup-tip{
+box-shadow:none;
+}
 
-    .popup-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+.leaflet-popup-content{
+margin:14px;
+min-width:210px;
+max-width:250px;
+}
 
-    .popup-link {
-      display: inline-block;
-      padding: 8px 12px;
-      border-radius: 12px;
-      text-decoration: none;
-      font-size: 12.5px;
-      font-weight: 700;
-      background: #111;
-      color: #fff;
-    }
+.popup-title{
+font-size:15px;
+font-weight:700;
+color:#222;
+margin-bottom:6px;
+}
 
-    .popup-link.secondary {
-      background: #f1f1f1;
-      color: #222;
-    }
-  </style>
+.popup-text{
+font-size:13px;
+line-height:1.4;
+color:#555;
+margin-bottom:10px;
+}
+
+.popup-actions{
+display:flex;
+gap:8px;
+}
+
+.popup-link{
+display:inline-block;
+padding:8px 12px;
+border-radius:12px;
+font-size:12.5px;
+font-weight:700;
+background:#111;
+color:#fff;
+text-decoration:none;
+}
+
+.popup-link.secondary{
+background:#efefef;
+color:#222;
+}
+
+</style>
 </head>
+
 <body>
-  <div id="map"></div>
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    crossorigin=""
-  ></script>
+<div id="map"></div>
 
-  <script>
-    const API_BASE = "https://script.google.com/macros/s/AKfycbwMobJD5dDOTuTxVeyEi2hTzND02jzJRlop8GjMgn_IbjtUi-I7ri1SM7EmUXt3yBXB/exec";
-    const DEFAULT_CENTER = [14.5975, -90.5132];
-    const DEFAULT_ZOOM = 13;
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    function getParam(name) {
-      const params = new URLSearchParams(window.location.search);
-      return (params.get(name) || "").trim();
-    }
+<script>
 
-    function norm(value) {
-      return String(value ?? "").trim().toUpperCase();
-    }
+/* API nueva */
 
-    function safeText(value) {
-      return String(value ?? "").trim();
-    }
+const API_BASE="https://script.google.com/macros/s/AKfycbxMvNBAGkKgZgQrpH1l4FDkpURgx7YaevAWKOnEGs381v0KmjCahdvWo-r5RfEaqxO_/exec";
 
-    function toNumber(value, fallback = null) {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : fallback;
-    }
+/* parámetros URL */
 
-    function isSi(value) {
-      return norm(value) === "SI";
-    }
+function getParam(name){
+const params=new URLSearchParams(window.location.search);
+return(params.get(name)||"").trim();
+}
 
-    function escapeHtml(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
+function norm(v){
+return String(v||"").trim().toUpperCase();
+}
 
-    function normalizeKey(key) {
-      return String(key ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, "")
-        .replace(/[^A-Za-z0-9_]/g, "")
-        .toUpperCase()
-        .trim();
-    }
+function toNumber(v,fallback=null){
+const n=Number(v);
+return Number.isFinite(n)?n:fallback;
+}
 
-    function getField(row, ...candidates) {
-      if (!row) return "";
+function safe(v){
+return String(v||"").trim();
+}
 
-      for (const name of candidates) {
-        if (name in row && safeText(row[name])) return safeText(row[name]);
-      }
+function isSi(v){
+return norm(v)==="SI";
+}
 
-      const map = {};
-      Object.keys(row).forEach(k => {
-        map[normalizeKey(k)] = row[k];
-      });
+/* idioma */
 
-      for (const name of candidates) {
-        const normalized = normalizeKey(name);
-        if (normalized in map && safeText(map[normalized])) {
-          return safeText(map[normalized]);
-        }
-      }
+function getIdioma(){
+return norm(getParam("idioma"))==="EN"?"EN":"ES";
+}
 
-      return "";
-    }
+/* fetch */
 
-    async function fetchSheet(sheetName) {
-      const url = `${API_BASE}?sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
-      const res = await fetch(url, { cache: "no-store" });
+async function fetchSheet(name){
 
-      if (!res.ok) {
-        throw new Error(`Error al cargar ${sheetName}: ${res.status}`);
-      }
+const res=await fetch(API_BASE+"?sheet="+name+"&v="+Date.now());
 
-      const data = await res.json();
+if(!res.ok){
+throw new Error("error loading "+name);
+}
 
-      if (!Array.isArray(data)) {
-        throw new Error(`La respuesta de ${sheetName} no es un array.`);
-      }
+return await res.json();
 
-      return data;
-    }
+}
 
-    function getIdioma() {
-      return norm(getParam("idioma")) === "EN" ? "EN" : "ES";
-    }
+/* mapa */
 
-    function getTitleByLanguage(row, idioma) {
-      if (idioma === "EN") {
-        return getField(
-          row,
-          "NOMBRE_VISIBLE_EN",
-          "NOMBRE_EN",
-          "TITULO_EN"
-        );
-      }
+const DEFAULT_CENTER=[14.5975,-90.5132];
+const DEFAULT_ZOOM=13;
 
-      return getField(
-        row,
-        "NOMBRE_VISIBLE_ES",
-        "NOMBRE_ES",
-        "TITULO_ES",
-        "NOMBRE_LUGAR",
-        "NOMBRE"
-      );
-    }
+const map=L.map("map",{
+zoomControl:false,
+attributionControl:false
+}).setView(DEFAULT_CENTER,DEFAULT_ZOOM);
 
-    function getDescriptionByLanguage(row, idioma) {
-      if (idioma === "EN") {
-        return getField(
-          row,
-          "DESCRIPCION_CORTA_EN",
-          "DESCRIPCION_EN",
-          "DESCRIPTION_EN",
-          "DESCRIPCION_INGLES"
-        );
-      }
+L.tileLayer(
+"https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+{
+subdomains:"abcd",
+maxZoom:20
+}
+).addTo(map);
 
-      return getField(
-        row,
-        "DESCRIPCION_CORTA_ES",
-        "DESCRIPCION_ES",
-        "DESCRIPCION"
-      );
-    }
+const layer=L.layerGroup().addTo(map);
 
-    function matchGuia(row, guiaFiltro) {
-      if (!guiaFiltro) return true;
-      return norm(getField(row, "GUIA")) === norm(guiaFiltro);
-    }
+/* iconos */
 
-    function matchCliente(row, clienteFiltro) {
-      if (!clienteFiltro) return true;
+function createIcon(row){
 
-      const cliente = norm(clienteFiltro);
-      const idCliente = norm(getField(row, "ID_CLIENTE"));
+const icon=row.ICONO_URL||row.ICONO;
 
-      return (
-        idCliente === cliente ||
-        idCliente === "GENERAL" ||
-        idCliente === "TODOS" ||
-        idCliente === "ALL" ||
-        idCliente === ""
-      );
-    }
+const size=Number(row.ICON_SIZE)||28;
 
-    function matchCategoria(row, categoriaFiltro) {
-      if (!categoriaFiltro) return true;
+if(!icon){
 
-      const categoria = norm(categoriaFiltro);
+return L.divIcon({
+html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:#111;"></div>`,
+iconSize:[size,size],
+iconAnchor:[size/2,size]
+});
 
-      return (
-        norm(getField(row, "CATEGORIA")) === categoria ||
-        norm(getField(row, "SUB_CATEGORIA")) === categoria
-      );
-    }
+}
 
-    function createIcon(row) {
-      const iconUrl = getField(row, "ICONO_URL", "ICONO");
-      const size = toNumber(getField(row, "ICON_SIZE"), 30) || 30;
+return L.icon({
+iconUrl:icon,
+iconSize:[size,size],
+iconAnchor:[size/2,size]
+});
 
-      if (!iconUrl) {
-        return L.divIcon({
-          className: "custom-div-icon",
-          html: `
-            <div style="
-              width:${size}px;
-              height:${size}px;
-              border-radius:50%;
-              background:#111;
-              border:2px solid #fff;
-              box-shadow:0 2px 8px rgba(0,0,0,0.18);
-            "></div>
-          `,
-          iconSize: [size, size],
-          iconAnchor: [size / 2, size],
-          popupAnchor: [0, -size + 8]
-        });
-      }
+}
 
-      return L.icon({
-        iconUrl,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size],
-        popupAnchor: [0, -size + 8]
-      });
-    }
+/* idioma */
 
-    function buildPopup(row, idioma) {
-      const title = escapeHtml(
-        getTitleByLanguage(row, idioma) ||
-        getField(row, "NOMBRE_LUGAR", "NOMBRE")
-      );
+function getTitle(row,idioma){
 
-      const desc = escapeHtml(getDescriptionByLanguage(row, idioma));
+if(idioma==="EN"){
+return safe(row.NOMBRE_VISIBLE_EN||row.NOMBRE_EN||row.NOMBRE);
+}
 
-      const mapsLink = getField(
-        row,
-        "LINK_GOOGLE_MAPS",
-        "LINK_MAPS",
-        "UBICACION_URL"
-      );
+return safe(row.NOMBRE_VISIBLE_ES||row.NOMBRE_ES||row.NOMBRE);
 
-      const reservaLink = getField(
-        row,
-        "LINK_RESERVA",
-        "RESERVA_URL"
-      );
+}
 
-      const howToGoText = idioma === "EN" ? "How to get there" : "Cómo llegar";
-      const reserveText = idioma === "EN" ? "Book" : "Reservar";
+function getDesc(row,idioma){
 
-      return `
-        <div>
-          ${title ? `<div class="popup-title">${title}</div>` : ""}
-          ${desc ? `<div class="popup-text">${desc}</div>` : ""}
-          <div class="popup-actions">
-            ${mapsLink ? `<a class="popup-link" href="${escapeHtml(mapsLink)}" target="_blank" rel="noopener noreferrer">${howToGoText}</a>` : ""}
-            ${reservaLink ? `<a class="popup-link secondary" href="${escapeHtml(reservaLink)}" target="_blank" rel="noopener noreferrer">${reserveText}</a>` : ""}
-          </div>
-        </div>
-      `;
-    }
+if(idioma==="EN"){
+return safe(row.DESCRIPCION_CORTA_EN||row.DESCRIPCION_EN);
+}
 
-    const guia = getParam("guia");
-    const cliente = getParam("cliente");
-    const categoria = getParam("categoria");
-    const idioma = getIdioma();
+return safe(row.DESCRIPCION_CORTA_ES||row.DESCRIPCION);
 
-    const map = L.map("map", {
-      zoomControl: false,
-      preferCanvas: true
-    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+}
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-      maxZoom: 20,
-      subdomains: "abcd"
-    }).addTo(map);
+/* popup */
 
-    const markersLayer = L.layerGroup().addTo(map);
+function popup(row,idioma){
 
-    async function initMap() {
-      try {
-        const [lugaresRaw, guiasRaw] = await Promise.all([
-          fetchSheet("LUGARES"),
-          fetchSheet("GUIAS")
-        ]);
+const title=getTitle(row,idioma);
+const desc=getDesc(row,idioma);
 
-        const guias = guiasRaw.filter(row => isSi(getField(row, "ACTIVO")));
-        const lugares = lugaresRaw.filter(row => isSi(getField(row, "ACTIVO")));
+const maps=row.LINK_GOOGLE_MAPS||row.LINK_MAPS;
+const book=row.LINK_RESERVA;
 
-        const guiaData = guias.find(row => norm(getField(row, "GUIA")) === norm(guia));
+const how=idioma==="EN"?"How to get there":"Cómo llegar";
+const reserve=idioma==="EN"?"Book":"Reservar";
 
-        if (guiaData) {
-          const latCentro = toNumber(getField(guiaData, "LAT_CENTRO"), DEFAULT_CENTER[0]);
-          const lngCentro = toNumber(getField(guiaData, "LNG_CENTRO"), DEFAULT_CENTER[1]);
-          const zoom = toNumber(getField(guiaData, "ZOOM"), DEFAULT_ZOOM);
-          map.setView([latCentro, lngCentro], zoom);
-        }
+return `
 
-        const filtrados = lugares.filter(row => {
-          return (
-            matchGuia(row, guia) &&
-            matchCliente(row, cliente) &&
-            matchCategoria(row, categoria)
-          );
-        });
+<div>
 
-        markersLayer.clearLayers();
+${title?`<div class="popup-title">${title}</div>`:""}
 
-        const bounds = [];
+${desc?`<div class="popup-text">${desc}</div>`:""}
 
-        filtrados.forEach(row => {
-          const lat = toNumber(getField(row, "LAT"));
-          const lng = toNumber(getField(row, "LNG"));
+<div class="popup-actions">
 
-          if (lat === null || lng === null) return;
+${maps?`<a class="popup-link" target="_blank" href="${maps}">${how}</a>`:""}
 
-          const marker = L.marker([lat, lng], {
-            icon: createIcon(row)
-          });
+${book?`<a class="popup-link secondary" target="_blank" href="${book}">${reserve}</a>`:""}
 
-          marker.bindPopup(buildPopup(row, idioma), {
-            closeButton: true,
-            autoPan: true
-          });
+</div>
 
-          marker.addTo(markersLayer);
-          bounds.push([lat, lng]);
-        });
+</div>
 
-        if (!guiaData && bounds.length > 0) {
-          map.fitBounds(bounds, { padding: [35, 35] });
-        }
+`;
 
-        console.log("Idioma:", idioma);
-        console.log("Ejemplo fila:", filtrados[0]);
-        console.log("Desc EN ejemplo:", filtrados[0] ? getDescriptionByLanguage(filtrados[0], "EN") : "");
-      } catch (error) {
-        console.error("Error cargando mapa:", error);
-      }
-    }
+}
 
-    initMap();
-  </script>
+/* filtros */
+
+function matchGuia(row,guia){
+
+if(!guia)return true;
+
+return norm(row.GUIA)===norm(guia);
+
+}
+
+function matchCliente(row,cliente){
+
+if(!cliente)return true;
+
+const id=norm(row.ID_CLIENTE);
+
+return id===norm(cliente)||id==="GENERAL"||id==="ALL"||id==="";
+
+}
+
+function matchCategoria(row,categoria){
+
+if(!categoria)return true;
+
+return norm(row.CATEGORIA)===norm(categoria)||norm(row.SUB_CATEGORIA)===norm(categoria);
+
+}
+
+/* init */
+
+async function init(){
+
+const guia=getParam("guia");
+const cliente=getParam("cliente");
+const categoria=getParam("categoria");
+const idioma=getIdioma();
+
+const lugares=await fetchSheet("LUGARES");
+const guias=await fetchSheet("GUIAS");
+
+const lugaresActivos=lugares.filter(r=>isSi(r.ACTIVO));
+
+const guiasActivas=guias.filter(r=>isSi(r.ACTIVO));
+
+const guiaData=guiasActivas.find(g=>norm(g.GUIA)===norm(guia));
+
+if(guiaData){
+
+map.setView(
+[
+toNumber(guiaData.LAT_CENTRO,DEFAULT_CENTER[0]),
+toNumber(guiaData.LNG_CENTRO,DEFAULT_CENTER[1])
+],
+toNumber(guiaData.ZOOM,DEFAULT_ZOOM)
+);
+
+}
+
+const filtrados=lugaresActivos.filter(r=>
+
+matchGuia(r,guia)&&
+matchCliente(r,cliente)&&
+matchCategoria(r,categoria)
+
+);
+
+const bounds=[];
+
+filtrados.forEach(row=>{
+
+const lat=toNumber(row.LAT);
+const lng=toNumber(row.LNG);
+
+if(lat===null||lng===null)return;
+
+const marker=L.marker([lat,lng],{
+icon:createIcon(row)
+});
+
+marker.bindPopup(popup(row,idioma));
+
+marker.addTo(layer);
+
+bounds.push([lat,lng]);
+
+});
+
+if(!guiaData&&bounds.length){
+map.fitBounds(bounds,{padding:[30,30]});
+}
+
+}
+
+init();
+
+</script>
+
 </body>
 </html>
