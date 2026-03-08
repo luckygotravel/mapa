@@ -1,129 +1,377 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LuckyGo Travel Map</title>
 
-<meta charset="utf-8"/>
-<title>Mapa</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
 
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #fff;
+    }
 
-<style>
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
 
-html,body{
-margin:0;
-height:100%;
-}
+    .popup-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      line-height: 1.2;
+    }
 
-#map{
-height:100vh;
-}
+    .popup-text {
+      font-size: 13px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      color: #333;
+    }
 
-.popup-title{
-font-weight:bold;
-font-size:16px;
-margin-bottom:6px;
-}
+    .popup-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
-.popup-text{
-font-size:13px;
-margin-bottom:10px;
-}
+    .popup-link {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      background: #111;
+      color: #fff;
+    }
 
-</style>
+    .popup-link.secondary {
+      background: #f2f2f2;
+      color: #111;
+    }
 
+    .map-status {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 9999;
+      background: rgba(255,255,255,0.95);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+      max-width: 300px;
+    }
+
+    .map-status strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+  </style>
 </head>
-
 <body>
 
-<div id="map"></div>
+  <div id="map"></div>
+  <div class="map-status" id="statusBox">
+    <strong>LuckyGo Map</strong>
+    Cargando mapa...
+  </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
 
-<script>
+  <script>
+    /************************************************************
+     * 1) CONFIG
+     ************************************************************/
+    const API_BASE = "https://script.google.com/macros/s/AKfycbwMobJD5dDOTuTxVeyEi2hTzND02jzJRlop8GjMgn_IbjtUi-I7ri1SM7EmUXt3yBXB/exec";
 
-const CSV_URL =
-"https://docs.google.com/spreadsheets/d/e/2PACX-1vQVppNDH_2igtMd4eQOmACoVRYmqpMCF5kozpYI8Ge6fjJPp6maPzKckFb7WM5EM_fmfkU1GsliFrH1/pub?gid=574652377&single=true&output=csv";
+    const DEFAULT_CENTER = [14.5975, -90.5132];
+    const DEFAULT_ZOOM = 13;
 
-function getParam(name){
-const params = new URLSearchParams(window.location.search);
-return params.get(name);
-}
+    /************************************************************
+     * 2) HELPERS
+     ************************************************************/
+    function getParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return (params.get(name) || "").trim();
+    }
 
-const PARAM_GUIA = getParam("guia");
-const PARAM_CLIENTE = getParam("cliente");
-const PARAM_CATEGORIA = getParam("categoria");
+    function norm(value) {
+      return String(value ?? "").trim().toUpperCase();
+    }
 
-const map = L.map('map').setView([14.60,-90.51],13);
+    function isSi(value) {
+      return norm(value) === "SI";
+    }
 
-L.tileLayer(
-'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-{ attribution:'© OpenStreetMap' }
-).addTo(map);
+    function toNumber(value, fallback = null) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
 
-fetch(CSV_URL)
-.then(res=>res.text())
-.then(csv=>{
+    function safeText(value) {
+      return String(value ?? "").trim();
+    }
 
-const rows = csv.split("\n").map(r=>r.split(","));
-const headers = rows[0];
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-const data = rows.slice(1).map(r=>{
-const obj={};
-headers.forEach((h,i)=>obj[h]=r[i]);
-return obj;
-});
+    async function fetchSheet(sheetName) {
+      const url = `${API_BASE}?sheet=${encodeURIComponent(sheetName)}`;
+      const res = await fetch(url, { cache: "no-store" });
 
-const bounds = L.latLngBounds([]);
+      if (!res.ok) {
+        throw new Error(`Error al cargar ${sheetName}: ${res.status}`);
+      }
 
-data
-.filter(r=>{
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        throw new Error(`La respuesta de ${sheetName} no es un array.`);
+      }
 
-if(PARAM_GUIA && r.GUIA!==PARAM_GUIA) return false;
+      return data;
+    }
 
-if(PARAM_CLIENTE){
-if(!(r.ID_CLIENTE===PARAM_CLIENTE || r.ID_CLIENTE==="General"))
-return false;
-}
+    function setStatus(html) {
+      document.getElementById("statusBox").innerHTML = html;
+    }
 
-if(PARAM_CATEGORIA && r.CATEGORIA!==PARAM_CATEGORIA)
-return false;
+    function getIdioma() {
+      const idioma = norm(getParam("idioma"));
+      return idioma === "EN" ? "EN" : "ES";
+    }
 
-return true;
+    function getTitleByLanguage(row, idioma) {
+      if (idioma === "EN") {
+        return safeText(row.NOMBRE_VISIBLE_EN || row.NOMBRE_VISIBLE_ES || row.NOMBRE_LUGAR);
+      }
+      return safeText(row.NOMBRE_VISIBLE_ES || row.NOMBRE_VISIBLE_EN || row.NOMBRE_LUGAR);
+    }
 
-})
-.forEach(r=>{
+    function getDescriptionByLanguage(row, idioma) {
+      if (idioma === "EN") {
+        return safeText(row.DESCRIPCION_CORTA_EN || row.DESCRIPCION_CORTA_ES || "");
+      }
+      return safeText(row.DESCRIPCION_CORTA_ES || row.DESCRIPCION_CORTA_EN || "");
+    }
 
-const lat=parseFloat(r.LAT);
-const lng=parseFloat(r.LNG);
+    function matchCategoria(row, categoriaFiltro) {
+      if (!categoriaFiltro) return true;
 
-if(!lat || !lng) return;
+      const cat = norm(categoriaFiltro);
+      return (
+        norm(row.CATEGORIA) === cat ||
+        norm(row.SUB_CATEGORIA) === cat
+      );
+    }
 
-const marker = L.marker([lat,lng]).addTo(map);
+    function matchCliente(row, clienteFiltro) {
+      if (!clienteFiltro) return true;
 
-marker.bindPopup(`
+      const cliente = norm(clienteFiltro);
+      const idCliente = norm(row.ID_CLIENTE);
 
-<div class="popup-title">
-${r.NOMBRE_LUGAR}
-</div>
+      return (
+        idCliente === cliente ||
+        idCliente === "GENERAL" ||
+        idCliente === "TODOS" ||
+        idCliente === "ALL" ||
+        idCliente === ""
+      );
+    }
 
-<div class="popup-text">
-${r.DESCRIPCION_CORTA_ES || ""}
-</div>
+    function matchGuia(row, guiaFiltro) {
+      if (!guiaFiltro) return true;
+      return norm(row.GUIA) === norm(guiaFiltro);
+    }
 
-`);
+    function createIcon(row) {
+      const iconUrl = safeText(row.ICONO_URL || row.ICONO);
+      const size = toNumber(row.ICON_SIZE, 34) || 34;
 
-bounds.extend([lat,lng]);
+      if (!iconUrl) {
+        return L.divIcon({
+          className: "custom-div-icon",
+          html: `<div style="
+            width:${size}px;
+            height:${size}px;
+            border-radius:50%;
+            background:#111;
+            border:2px solid #fff;
+            box-shadow:0 2px 8px rgba(0,0,0,0.25);
+          "></div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size],
+          popupAnchor: [0, -size + 8]
+        });
+      }
 
-});
+      return L.icon({
+        iconUrl,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size + 8]
+      });
+    }
 
-if(bounds.isValid()){
-map.fitBounds(bounds,{padding:[40,40]});
-}
+    function buildPopup(row, idioma) {
+      const title = escapeHtml(getTitleByLanguage(row, idioma));
+      const desc = escapeHtml(getDescriptionByLanguage(row, idioma));
+      const nombreLugar = escapeHtml(safeText(row.NOMBRE_LUGAR || ""));
+      const mapsLink = safeText(row.LINK_GOOGLE_MAPS || "");
+      const reservaLink = safeText(row.LINK_RESERVA || "");
 
-});
+      const howToGoText = idioma === "EN" ? "How to get there" : "Cómo llegar";
+      const reserveText = idioma === "EN" ? "Book" : "Reservar";
 
-</script>
+      return `
+        <div style="min-width:220px; max-width:280px;">
+          <div class="popup-title">${title || nombreLugar}</div>
+          ${nombreLugar && title !== nombreLugar ? `<div class="popup-text"><strong>${nombreLugar}</strong></div>` : ""}
+          ${desc ? `<div class="popup-text">${desc}</div>` : ""}
+          <div class="popup-actions">
+            ${mapsLink ? `<a class="popup-link" href="${escapeHtml(mapsLink)}" target="_blank" rel="noopener noreferrer">${howToGoText}</a>` : ""}
+            ${reservaLink ? `<a class="popup-link secondary" href="${escapeHtml(reservaLink)}" target="_blank" rel="noopener noreferrer">${reserveText}</a>` : ""}
+          </div>
+        </div>
+      `;
+    }
 
+    /************************************************************
+     * 3) PARAMS
+     ************************************************************/
+    const guia = getParam("guia");
+    const cliente = getParam("cliente");
+    const categoria = getParam("categoria");
+    const idioma = getIdioma();
+
+    /************************************************************
+     * 4) MAP INIT
+     ************************************************************/
+    const map = L.map("map", {
+      zoomControl: true
+    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 20,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    const markersLayer = L.layerGroup().addTo(map);
+
+    /************************************************************
+     * 5) LOAD DATA
+     ************************************************************/
+    async function initMap() {
+      try {
+        setStatus(`
+          <strong>LuckyGo Map</strong>
+          Cargando datos...
+        `);
+
+        const [lugaresRaw, guiasRaw] = await Promise.all([
+          fetchSheet("LUGARES"),
+          fetchSheet("GUIAS")
+        ]);
+
+        const guias = guiasRaw.filter(row => isSi(row.ACTIVO));
+        const lugares = lugaresRaw.filter(row => isSi(row.ACTIVO));
+
+        const guiaData = guias.find(row => norm(row.GUIA) === norm(guia));
+
+        if (guiaData) {
+          const latCentro = toNumber(guiaData.LAT_CENTRO, DEFAULT_CENTER[0]);
+          const lngCentro = toNumber(guiaData.LNG_CENTRO, DEFAULT_CENTER[1]);
+          const zoom = toNumber(guiaData.ZOOM, DEFAULT_ZOOM);
+
+          map.setView([latCentro, lngCentro], zoom);
+        }
+
+        const filtrados = lugares.filter(row => {
+          return (
+            matchGuia(row, guia) &&
+            matchCliente(row, cliente) &&
+            matchCategoria(row, categoria)
+          );
+        });
+
+        markersLayer.clearLayers();
+
+        const bounds = [];
+
+        filtrados.forEach(row => {
+          const lat = toNumber(row.LAT);
+          const lng = toNumber(row.LNG);
+
+          if (lat === null || lng === null) return;
+
+          const marker = L.marker([lat, lng], {
+            icon: createIcon(row)
+          });
+
+          marker.bindPopup(buildPopup(row, idioma));
+          marker.addTo(markersLayer);
+
+          bounds.push([lat, lng]);
+        });
+
+        if (bounds.length > 0) {
+          if (!guiaData) {
+            map.fitBounds(bounds, { padding: [40, 40] });
+          }
+
+          setStatus(`
+            <strong>LuckyGo Map</strong>
+            ${filtrados.length} lugar(es) cargados<br>
+            ${guia ? `Guía: ${escapeHtml(guia)}<br>` : ""}
+            ${cliente ? `Cliente: ${escapeHtml(cliente)}<br>` : ""}
+            ${categoria ? `Categoría: ${escapeHtml(categoria)}<br>` : ""}
+            Idioma: ${idioma}
+          `);
+        } else {
+          setStatus(`
+            <strong>LuckyGo Map</strong>
+            No se encontraron lugares con esos filtros.
+          `);
+        }
+
+        console.log("Parámetros URL:", { guia, cliente, categoria, idioma });
+        console.log("GUIAS cargadas:", guias.length);
+        console.log("LUGARES cargados:", lugares.length);
+        console.log("LUGARES filtrados:", filtrados);
+
+      } catch (error) {
+        console.error("Error general:", error);
+
+        setStatus(`
+          <strong>LuckyGo Map</strong>
+          Error cargando datos.<br>
+          Revisá la consola del navegador.
+        `);
+      }
+    }
+
+    initMap();
+  </script>
 </body>
 </html>
