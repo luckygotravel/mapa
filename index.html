@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8"/>
+<title>Mapa</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+
+html,body{
+margin:0;
+height:100%;
+}
+
+#map{
+height:100vh;
+}
+
+.popup-title{
+font-weight:bold;
+font-size:16px;
+margin-bottom:6px;
+}
+
+.popup-text{
+font-size:13px;
+margin-bottom:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const CSV_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vQVppNDH_2igtMd4eQOmACoVRYmqpMCF5kozpYI8Ge6fjJPp6maPzKckFb7WM5EM_fmfkU1GsliFrH1/pub?gid=574652377&single=true&output=csv";
+
+function getParam(name){
+const params = new URLSearchParams(window.location.search);
+return params.get(name);
+}
+
+const PARAM_GUIA = getParam("guia");
+const PARAM_CLIENTE = getParam("cliente");
+const PARAM_CATEGORIA = getParam("categoria");
+
+const map = L.map('map').setView([14.60,-90.51],13);
+
+L.tileLayer(
+'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+{ attribution:'© OpenStreetMap' }
+).addTo(map);
+
+fetch(CSV_URL)
+.then(res=>res.text())
+.then(csv=>{
+
+const rows = csv.split("\n").map(r=>r.split(","));
+const headers = rows[0];
+
+const data = rows.slice(1).map(r=>{
+const obj={};
+headers.forEach((h,i)=>obj[h]=r[i]);
+return obj;
+});
+
+const bounds = L.latLngBounds([]);
+
+data
+.filter(r=>{
+
+if(PARAM_GUIA && r.GUIA!==PARAM_GUIA) return false;
+
+if(PARAM_CLIENTE){
+if(!(r.ID_CLIENTE===PARAM_CLIENTE || r.ID_CLIENTE==="General"))
+return false;
+}
+
+if(PARAM_CATEGORIA && r.CATEGORIA!==PARAM_CATEGORIA)
+return false;
+
+return true;
+
+})
+.forEach(r=>{
+
+const lat=parseFloat(r.LAT);
+const lng=parseFloat(r.LNG);
+
+if(!lat || !lng) return;
+
+const marker = L.marker([lat,lng]).addTo(map);
+
+marker.bindPopup(`
+
+<div class="popup-title">
+${r.NOMBRE_LUGAR}
+</div>
+
+<div class="popup-text">
+${r.DESCRIPCION_CORTA_ES || ""}
+</div>
+
+`);
+
+bounds.extend([lat,lng]);
+
+});
+
+if(bounds.isValid()){
+map.fitBounds(bounds,{padding:[40,40]});
+}
+
+});
+
+</script>
+
+</body>
+</html>
