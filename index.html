@@ -1,89 +1,93 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LuckyGo Map</title>
 
-<title>LuckyGo Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: Arial, sans-serif;
+      background: #fff;
+    }
 
-<style>
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
 
-html,body{
-margin:0;
-padding:0;
-height:100%;
-width:100%;
-font-family:Arial;
-background:#fff;
-}
+    .leaflet-control-container {
+      display: none;
+    }
 
-#map{
-height:100vh;
-width:100%;
-}
+    .leaflet-popup-content-wrapper {
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
 
-/* mapa minimalista */
+    .leaflet-popup-tip {
+      box-shadow: none;
+    }
 
-.leaflet-control-container{
-display:none;
-}
+    .leaflet-popup-content {
+      margin: 14px;
+      min-width: 220px;
+      max-width: 260px;
+    }
 
-.leaflet-popup-content-wrapper{
-border-radius:16px;
-box-shadow:0 8px 24px rgba(0,0,0,0.12);
-}
+    .popup-category {
+      font-size: 12px;
+      font-weight: 700;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 6px;
+    }
 
-.leaflet-popup-tip{
-box-shadow:none;
-}
+    .popup-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #222;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
 
-.leaflet-popup-content{
-margin:14px;
-min-width:210px;
-max-width:250px;
-}
+    .popup-text {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #555;
+      margin-bottom: 12px;
+    }
 
-.popup-title{
-font-size:15px;
-font-weight:700;
-color:#222;
-margin-bottom:6px;
-}
+    .popup-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
-.popup-text{
-font-size:13px;
-line-height:1.4;
-color:#555;
-margin-bottom:10px;
-}
+    .popup-link {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 12.5px;
+      font-weight: 700;
+      background: #111;
+      color: #fff;
+      text-decoration: none;
+    }
 
-.popup-actions{
-display:flex;
-gap:8px;
-}
-
-.popup-link{
-display:inline-block;
-padding:8px 12px;
-border-radius:12px;
-font-size:12.5px;
-font-weight:700;
-background:#111;
-color:#fff;
-text-decoration:none;
-}
-
-.popup-link.secondary{
-background:#efefef;
-color:#222;
-}
-
-</style>
+    .popup-link.secondary {
+      background: #efefef;
+      color: #222;
+    }
+  </style>
 </head>
-
 <body>
 
 <div id="map"></div>
@@ -91,253 +95,195 @@ color:#222;
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+const API_BASE = "https://script.google.com/macros/s/AKfycbxMvNBAGkKgZgQrpH1l4FDkpURgx7YaevAWKOnEGs381v0KmjCahdvWo-r5RfEaqxO_/exec";
 
-/* API */
-
-const API_BASE="https://script.google.com/macros/s/AKfycbxMvNBAGkKgZgQrpH1l4FDkpURgx7YaevAWKOnEGs381v0KmjCahdvWo-r5RfEaqxO_/exec";
-
-/* helpers */
-
-function getParam(name){
-const params=new URLSearchParams(window.location.search);
-return(params.get(name)||"").trim();
+function getParam(name) {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get(name) || "").trim();
 }
 
-function norm(v){
-return String(v||"").trim().toUpperCase();
+function norm(v) {
+  return String(v || "").trim().toUpperCase();
 }
 
-function safe(v){
-return String(v||"").trim();
+function safe(v) {
+  return String(v || "").trim();
 }
 
-function toNumber(v,fallback=null){
-const n=Number(v);
-return Number.isFinite(n)?n:fallback;
+function toNumber(v, fallback = null) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-function isSi(v){
-return norm(v)==="SI";
+function isSi(v) {
+  return norm(v) === "SI";
 }
 
-/* idioma */
-
-function getIdioma(){
-return norm(getParam("idioma"))==="EN"?"EN":"ES";
+function getIdioma() {
+  return norm(getParam("idioma")) === "EN" ? "EN" : "ES";
 }
 
-/* fetch */
+async function fetchSheet(name) {
+  const res = await fetch(API_BASE + "?sheet=" + encodeURIComponent(name) + "&v=" + Date.now(), {
+    cache: "no-store"
+  });
 
-async function fetchSheet(name){
+  if (!res.ok) {
+    throw new Error("Error loading " + name);
+  }
 
-const res=await fetch(API_BASE+"?sheet="+name+"&v="+Date.now());
-
-if(!res.ok){
-throw new Error("error loading "+name);
+  return await res.json();
 }
 
-return await res.json();
+const DEFAULT_CENTER = [14.5975, -90.5132];
+const DEFAULT_ZOOM = 13;
 
-}
-
-/* mapa */
-
-const DEFAULT_CENTER=[14.5975,-90.5132];
-const DEFAULT_ZOOM=13;
-
-const map=L.map("map",{
-zoomControl:false,
-attributionControl:false
-}).setView(DEFAULT_CENTER,DEFAULT_ZOOM);
+const map = L.map("map", {
+  zoomControl: false,
+  attributionControl: false
+}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
 L.tileLayer(
-"https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-{
-subdomains:"abcd",
-maxZoom:20
-}
+  "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+  {
+    subdomains: "abcd",
+    maxZoom: 20
+  }
 ).addTo(map);
 
-const layer=L.layerGroup().addTo(map);
+const layer = L.layerGroup().addTo(map);
 
-/* iconos */
+function createIcon(row) {
+  const icon = safe(row.ICONO_URL);
+  const size = Number(row.ICON_SIZE) || 28;
 
-function createIcon(row){
+  if (!icon) {
+    return L.divIcon({
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#111;"></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size],
+      popupAnchor: [0, -size + 8],
+      className: ""
+    });
+  }
 
-const icon=row.ICONO_URL||row.ICONO;
-const size=Number(row.ICON_SIZE)||28;
-
-if(!icon){
-
-return L.divIcon({
-html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:#111;"></div>`,
-iconSize:[size,size],
-iconAnchor:[size/2,size]
-});
-
+  return L.icon({
+    iconUrl: icon,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size + 8]
+  });
 }
 
-return L.icon({
-iconUrl:icon,
-iconSize:[size,size],
-iconAnchor:[size/2,size]
-});
-
+function getCategoryName(row, idioma) {
+  if (idioma === "EN") return safe(row.NOMBRE_CATEGORIA_EN);
+  return safe(row.NOMBRE_CATEGORIA_ES);
 }
 
-/* titulo */
-
-function getTitle(row,idioma){
-
-if(idioma==="EN"){
-return safe(row.NOMBRE_VISIBLE_EN||row.NOMBRE_EN||row.NOMBRE);
+function getDescription(row, idioma) {
+  if (idioma === "EN") return safe(row.DESCRIPCION_CORTA_EN);
+  return safe(row.DESCRIPCION_CORTA_ES);
 }
 
-return safe(row.NOMBRE_VISIBLE_ES||row.NOMBRE_ES||row.NOMBRE);
-
+function getInfoLink(row, idioma) {
+  if (idioma === "EN") return safe(row.LINK_INFORMACION_EN);
+  return safe(row.LINK_INFORMACION_ES);
 }
 
-/* descripcion */
+function popup(row, idioma) {
+  const categoria = getCategoryName(row, idioma);
+  const nombreLugar = safe(row.NOMBRE_LUGAR);
+  const descripcion = getDescription(row, idioma);
+  const maps = safe(row.LINK_GOOGLE_MAPS);
+  const info = getInfoLink(row, idioma);
 
-function getDesc(row,idioma){
+  const how = idioma === "EN" ? "How to get there" : "Cómo llegar";
+  const more = idioma === "EN" ? "More info" : "Más info";
 
-if(idioma==="EN"){
-return safe(row.DESCRIPCION_CORTA_EN);
+  return `
+    <div>
+      ${categoria ? `<div class="popup-category">${categoria}</div>` : ""}
+      ${nombreLugar ? `<div class="popup-title">${nombreLugar}</div>` : ""}
+      ${descripcion ? `<div class="popup-text">${descripcion}</div>` : ""}
+      <div class="popup-actions">
+        ${maps ? `<a class="popup-link" target="_blank" rel="noopener" href="${maps}">${how}</a>` : ""}
+        ${info ? `<a class="popup-link secondary" target="_blank" rel="noopener" href="${info}">${more}</a>` : ""}
+      </div>
+    </div>
+  `;
 }
 
-return safe(row.DESCRIPCION_CORTA_ES);
-
+function matchGuia(row, guia) {
+  if (!guia) return true;
+  return norm(row.GUIA) === norm(guia);
 }
 
-/* popup */
+function matchCliente(row, cliente) {
+  if (!cliente) return true;
 
-function popup(row,idioma){
-
-const title=getTitle(row,idioma);
-const desc=getDesc(row,idioma);
-
-const maps=row.LINK_GOOGLE_MAPS||row.LINK_MAPS||"";
-const book=row.LINK_RESERVA||"";
-
-const how=idioma==="EN"?"How to get there":"Cómo llegar";
-const reserve=idioma==="EN"?"Book":"Reservar";
-
-return `
-
-<div>
-
-${title?`<div class="popup-title">${title}</div>`:""}
-
-${desc?`<div class="popup-text">${desc}</div>`:""}
-
-<div class="popup-actions">
-
-${maps?`<a class="popup-link" target="_blank" href="${maps}">${how}</a>`:""}
-
-${book?`<a class="popup-link secondary" target="_blank" href="${book}">${reserve}</a>`:""}
-
-</div>
-
-</div>
-
-`;
-
+  const id = norm(row.ID_CLIENTE);
+  return id === norm(cliente) || id === "GENERAL" || id === "ALL" || id === "";
 }
 
-/* filtros */
-
-function matchGuia(row,guia){
-
-if(!guia)return true;
-
-return norm(row.GUIA)===norm(guia);
-
+function matchCategoria(row, categoria) {
+  if (!categoria) return true;
+  return norm(row.CATEGORIA) === norm(categoria) || norm(row.SUB_CATEGORIA) === norm(categoria);
 }
 
-function matchCliente(row,cliente){
+async function init() {
+  const guia = getParam("guia");
+  const cliente = getParam("cliente");
+  const categoria = getParam("categoria");
+  const idioma = getIdioma();
 
-if(!cliente)return true;
+  const lugares = await fetchSheet("LUGARES");
+  const guias = await fetchSheet("GUIAS");
 
-const id=norm(row.ID_CLIENTE);
+  const lugaresActivos = lugares.filter(r => isSi(r.ACTIVO));
+  const guiasActivas = guias.filter(r => isSi(r.ACTIVO));
 
-return id===norm(cliente)||id==="GENERAL"||id==="ALL"||id==="";
+  const guiaData = guiasActivas.find(g => norm(g.GUIA) === norm(guia));
 
+  if (guiaData) {
+    map.setView(
+      [
+        toNumber(guiaData.LAT_CENTRO, DEFAULT_CENTER[0]),
+        toNumber(guiaData.LNG_CENTRO, DEFAULT_CENTER[1])
+      ],
+      toNumber(guiaData.ZOOM, DEFAULT_ZOOM)
+    );
+  }
+
+  const filtrados = lugaresActivos.filter(r =>
+    matchGuia(r, guia) &&
+    matchCliente(r, cliente) &&
+    matchCategoria(r, categoria)
+  );
+
+  const bounds = [];
+
+  filtrados.forEach(row => {
+    const lat = toNumber(row.LAT);
+    const lng = toNumber(row.LNG);
+
+    if (lat === null || lng === null) return;
+
+    const marker = L.marker([lat, lng], {
+      icon: createIcon(row)
+    });
+
+    marker.bindPopup(popup(row, idioma));
+    marker.addTo(layer);
+
+    bounds.push([lat, lng]);
+  });
+
+  if (!guiaData && bounds.length) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
 }
 
-function matchCategoria(row,categoria){
-
-if(!categoria)return true;
-
-return norm(row.CATEGORIA)===norm(categoria)||norm(row.SUB_CATEGORIA)===norm(categoria);
-
-}
-
-/* init */
-
-async function init(){
-
-const guia=getParam("guia");
-const cliente=getParam("cliente");
-const categoria=getParam("categoria");
-const idioma=getIdioma();
-
-const lugares=await fetchSheet("LUGARES");
-const guias=await fetchSheet("GUIAS");
-
-const lugaresActivos=lugares.filter(r=>isSi(r.ACTIVO));
-const guiasActivas=guias.filter(r=>isSi(r.ACTIVO));
-
-const guiaData=guiasActivas.find(g=>norm(g.GUIA)===norm(guia));
-
-if(guiaData){
-
-map.setView(
-[
-toNumber(guiaData.LAT_CENTRO,DEFAULT_CENTER[0]),
-toNumber(guiaData.LNG_CENTRO,DEFAULT_CENTER[1])
-],
-toNumber(guiaData.ZOOM,DEFAULT_ZOOM)
-);
-
-}
-
-const filtrados=lugaresActivos.filter(r=>
-
-matchGuia(r,guia)&&
-matchCliente(r,cliente)&&
-matchCategoria(r,categoria)
-
-);
-
-const bounds=[];
-
-filtrados.forEach(row=>{
-
-const lat=toNumber(row.LAT);
-const lng=toNumber(row.LNG);
-
-if(lat===null||lng===null)return;
-
-const marker=L.marker([lat,lng],{
-icon:createIcon(row)
-});
-
-marker.bindPopup(popup(row,idioma));
-
-marker.addTo(layer);
-
-bounds.push([lat,lng]);
-
-});
-
-if(!guiaData&&bounds.length){
-map.fitBounds(bounds,{padding:[30,30]});
-}
-
-}
-
-init();
-
+init().catch(console.error);
 </script>
 
 </body>
