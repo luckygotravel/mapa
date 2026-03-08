@@ -92,11 +92,11 @@ color:#222;
 
 <script>
 
-/* API nueva */
+/* API */
 
 const API_BASE="https://script.google.com/macros/s/AKfycbxMvNBAGkKgZgQrpH1l4FDkpURgx7YaevAWKOnEGs381v0KmjCahdvWo-r5RfEaqxO_/exec";
 
-/* parámetros URL */
+/* helpers */
 
 function getParam(name){
 const params=new URLSearchParams(window.location.search);
@@ -107,13 +107,13 @@ function norm(v){
 return String(v||"").trim().toUpperCase();
 }
 
+function safe(v){
+return String(v||"").trim();
+}
+
 function toNumber(v,fallback=null){
 const n=Number(v);
 return Number.isFinite(n)?n:fallback;
-}
-
-function safe(v){
-return String(v||"").trim();
 }
 
 function isSi(v){
@@ -165,7 +165,6 @@ const layer=L.layerGroup().addTo(map);
 function createIcon(row){
 
 const icon=row.ICONO_URL||row.ICONO;
-
 const size=Number(row.ICON_SIZE)||28;
 
 if(!icon){
@@ -186,7 +185,7 @@ iconAnchor:[size/2,size]
 
 }
 
-/* idioma */
+/* titulo */
 
 function getTitle(row,idioma){
 
@@ -198,13 +197,15 @@ return safe(row.NOMBRE_VISIBLE_ES||row.NOMBRE_ES||row.NOMBRE);
 
 }
 
+/* descripcion */
+
 function getDesc(row,idioma){
 
 if(idioma==="EN"){
-return safe(row.DESCRIPCION_CORTA_EN||row.DESCRIPCION_EN);
+return safe(row.DESCRIPCION_CORTA_EN);
 }
 
-return safe(row.DESCRIPCION_CORTA_ES||row.DESCRIPCION);
+return safe(row.DESCRIPCION_CORTA_ES);
 
 }
 
@@ -215,8 +216,8 @@ function popup(row,idioma){
 const title=getTitle(row,idioma);
 const desc=getDesc(row,idioma);
 
-const maps=row.LINK_GOOGLE_MAPS||row.LINK_MAPS;
-const book=row.LINK_RESERVA;
+const maps=row.LINK_GOOGLE_MAPS||row.LINK_MAPS||"";
+const book=row.LINK_RESERVA||"";
 
 const how=idioma==="EN"?"How to get there":"Cómo llegar";
 const reserve=idioma==="EN"?"Book":"Reservar";
@@ -284,7 +285,6 @@ const lugares=await fetchSheet("LUGARES");
 const guias=await fetchSheet("GUIAS");
 
 const lugaresActivos=lugares.filter(r=>isSi(r.ACTIVO));
-
 const guiasActivas=guias.filter(r=>isSi(r.ACTIVO));
 
 const guiaData=guiasActivas.find(g=>norm(g.GUIA)===norm(guia));
